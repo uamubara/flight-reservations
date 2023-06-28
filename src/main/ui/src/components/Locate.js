@@ -18,6 +18,7 @@ function Locate(props) {
     }
 
     return (
+
         <div>
             <TextInput onSubmit={submit} display={props.display} onChange={(e) => setValue(e.target.value)} value={value} />
             <LocationSelect data={locations} handleChoice={props.handleChoice} />

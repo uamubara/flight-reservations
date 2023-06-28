@@ -1,30 +1,46 @@
-import React, { useState } from 'react'
-import Locate from './components/Locate';
-import Flight from './components/Flight';
-import Confirm from './components/Confirm';
-import Order from './components/Order';
+import React, { useEffect } from "react";
+import Scrollreveal from "scrollreveal";
+import Booking from "./components/Booking";
+import Footer from "./components/Footer";
+import Hero from "./components/Hero";
+import Navbar from "./components/Navbar";
+import Recommended from "./components/Recommended";
+import Reviews from "./components/Reviews";
+import ScrollToTop from "./components/ScrollToTop";
+import Services from "./components/Services";
 
 export default function App() {
-    const [origin, setOrigin] = useState();
-    const [destination, setDestination] = useState();
-    const [flight, setFlight] = useState();
-    const [confirmation, setConfirmation] = useState();
-    const [order, setOrder] = useState();
+    useEffect(() => {
+        const sr = Scrollreveal({
+            origin: "top",
+            distance: "80px",
+            duration: 2000,
+            reset: true,
+        });
+        sr.reveal(`
+      nav,
+      #hero,
+      #services,
+      #recommended,
+      #reviews,
+      #Booking
+      footer
+    `, {
+            opacity: 0,
+            interval: 300,
+        });
+    }, []);
 
     return (
         <div>
-            <Locate handleChoice={setDestination} display={"Origin"}/>
-            <Locate handleChoice={setOrigin} display={"Destination"}/>
-            { origin &&
-            destination &&
-            <Flight origin={origin} destination={destination} setFlight={setFlight}/>
-            }
-            { flight &&
-            <Confirm flight={flight} setConfirmation={setConfirmation} />
-            }
-            { confirmation &&
-            <Order confirmation={confirmation} order={order} setOrder={setOrder} />
-            }
+            <ScrollToTop />
+            <Navbar />
+            <Hero />
+            <Services />
+            <Recommended />
+            <Reviews />
+            <Booking />
+            <Footer />
         </div>
-    )
+    );
 }

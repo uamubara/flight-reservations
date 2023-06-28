@@ -2,8 +2,8 @@ import React, { useState } from "react";
 
 function Order(props) {
     const [traveler, setTraveler] = useState("");
-    const [fname, setFname] = useState("Harryette");
-    const [lname, setLname] = useState("Mullen");
+    const [fname, setFname] = useState("");
+    const [lname, setLname] = useState("");
     const [dob, setDob] = useState("1990-01-01");
 
     function makeTraveler(event){
