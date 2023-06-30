@@ -1,4 +1,4 @@
-# flight-reservations
+# Flight-Reservations
 
 This Flight Booking Application is a web-based platform that utilizes the Amadeus Flight APIs to help users find and book flights. 
 The application is built using a Spring backend and a React frontend, providing a seamless user experience and efficient flight search functionality.
