@@ -4,10 +4,13 @@ The application is built using a Spring backend and a React frontend, providing 
 
 
 
+
 ![CaptureFlyBooking1](https://github.com/uamubara/flight-reservations/assets/36746517/90691ac6-9d7a-457e-8e54-457261e576a6)
 
 
-Technologies Used
+
+Technologies Used:
+
 The Flight Booking Application leverages the following technologies:
 
 Spring Backend: The backend of the application is developed using the Spring framework, which provides a robust and scalable foundation for handling API requests, data retrieval, and business logic implementation.
