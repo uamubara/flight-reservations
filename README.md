@@ -1,4 +1,5 @@
 # flight-reservations
+
 This Flight Booking Application is a web-based platform that utilizes the Amadeus Flight APIs to help users find and book flights. 
 The application is built using a Spring backend and a React frontend, providing a seamless user experience and efficient flight search functionality.
 
@@ -6,7 +7,14 @@ The application is built using a Spring backend and a React frontend, providing 
 
 
 
+
 ![CaptureFlyBooking1](https://github.com/uamubara/flight-reservations/assets/36746517/90691ac6-9d7a-457e-8e54-457261e576a6)
+
+
+
+
+
+
 
 
 
