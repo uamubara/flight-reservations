@@ -1,83 +1,49 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import styled from "styled-components";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
-function Order(props) {
-    const [traveler, setTraveler] = useState("");
-    const [fname, setFname] = useState("");
-    const [lname, setLname] = useState("");
-    const [dob, setDob] = useState("1990-01-01");
+export default function Order() {
+    const [offer, setOffer] = useState(null);
+    const [placing, setPlacing] = useState(false);
 
-    function makeTraveler(event){
-        event.preventDefault();
-        fetch("api/traveler/", {
-            method: "post",
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                data: {
-                    fname: fname,
-                    lname: lname,
-                    dob: dob
-                }
-            })
-        })
-            .then((response) => response.json())
-            .then((json) => {
-                setTraveler(json);
-            });
-    }
+    useEffect(() => {
+        const raw = localStorage.getItem("selectedOffer");
+        if (raw) setOffer(JSON.parse(raw));
+    }, []);
 
-    function submit(event, props){
-        event.preventDefault();
-        fetch("api/order/", {
-            method: "post",
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                data: {
-                    type: "flight-order",
-                    flightOffers: props.confirmation.flightOffers,
-                    travelers: [traveler]
-                }
-            })
-        })
-            .then((response) => response.json())
-            .then((json) => {
-                props.setOrder(json);
-            });
-    }
+    const placeOrder = async () => {
+        if (!offer) return;
+        setPlacing(true);
+        try {
+            // Example next steps:
+            // 1) POST /api/flights/confirm with the selected offer
+            // 2) POST /api/bookings/order with traveler + confirmed offer
+            alert("Order placed (wire to API next).");
+        } finally {
+            setPlacing(false);
+        }
+    };
 
     return (
-        <div>
-            <form onSubmit={(e) => makeTraveler(e)}>
-                <label htmlFor="dob">Date of Birth:</label>
-                <input type="date"
-                       onChange={(e) => setDob(e.target.value)}
-                       id="dob"
-                       name="dob"
-                       required /><br></br>
-                <label>First Name: </label>
-                <input value={fname} onChange={(e) => setFname(e.target.value)} required></input><br></br>
-                <label>Last Name: </label>
-                <input value={lname} onChange={(e) => setLname(e.target.value)} required></input><br></br>
-                <input type="submit" value="Submit Traveler Info" />
-            </form>
-            { traveler &&
-            <form onSubmit={(e) => submit(e, props)}>
-                <input type="submit" value="Book Flight" />
-            </form>
-            }
-            { props.order &&
-            <div>
-                <div>Flight Booked! Here are the details:</div>
-                <div>{JSON.stringify(props.order)}</div>
-            </div>
-            }
-        </div>
+        <>
+            <Navbar bookingNav />
+            <Wrap>
+                <h2>Passenger & Payment</h2>
+                <p>Wire this form to your `/api/traveler`, `/api/flights/confirm`, and `/api/bookings/order`.</p>
+                <div className="box">
+                    <button disabled={!offer || placing} onClick={placeOrder}>
+                        {placing ? "Placing…" : "Place Order"}
+                    </button>
+                </div>
+            </Wrap>
+            <Footer />
+        </>
     );
-};
+}
 
-export default Order;
+const Wrap = styled.main`
+  max-width: 900px; margin: 2rem auto; padding: 0 1rem;
+  .box{background:#fff;border:1px solid #e7eef6;border-radius:1rem;padding:1rem;box-shadow:0 12px 28px rgba(2,62,138,.08)}
+  button{background:#0b7285;color:#fff;border:none;border-radius:999px;padding:.7rem 1.2rem;font-weight:800;cursor:pointer}
+`;

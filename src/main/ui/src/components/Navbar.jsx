@@ -41,7 +41,7 @@ export default function Navbar() {
                 </ul>
 
 
-                <Link to="/book" className="book-btn">Book Flight</Link>
+                <Link to="/booking" className="book-btn">Book Flight</Link>
             </Nav>
 
             <ResponsiveNav state={navbarState}>
