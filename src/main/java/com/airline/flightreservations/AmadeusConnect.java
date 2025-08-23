@@ -41,12 +41,14 @@ public class AmadeusConnect {
     // Flight Search
     public FlightOfferSearch[] flights(String origin, String destination,
                                        String departDate, String adults,
-                                       String returnDate, int maxResults) throws ResponseException {
+                                       String returnDate, int maxResults,
+                                       String currencyCode) throws ResponseException {
 
         Params params = Params.with("originLocationCode", origin)
                 .and("destinationLocationCode", destination)
                 .and("departureDate", departDate)
                 .and("adults", adults)
+                .and("currencyCode", (currencyCode == null || currencyCode.isEmpty()) ? "USD" : currencyCode)
                 .and("max", maxResults);
 
         if (returnDate != null && !returnDate.isEmpty()) {

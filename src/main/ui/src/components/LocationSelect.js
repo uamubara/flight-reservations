@@ -1,85 +1,111 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 
-export default function LocationSelect({ placeholder = "City or airport", onPick }) {
+// read backend base URL from .env (REACT_APP_API_BASE)
+const BASE = (process.env.REACT_APP_API_BASE || "http://localhost:8081").replace(/\/$/, "");
+
+/**
+ *   use this controlled component anywhere I need an airport picker.
+ * - When user begins to type, fetch /api/locations?keyword=...
+ * - render "City, ST – Airport (IATA)" in the dropdown
+ * - When the user picks an option,  pass { code, display } back up via onChange
+ */
+export default function LocationSelect({ label, placeholder, value, onChange }) {
+    // value is the current IATA code. I'll keep a pretty string separately for the input.
     const [query, setQuery] = useState("");
-    const [opts, setOpts] = useState([]);
     const [open, setOpen] = useState(false);
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const boxRef = useRef(null);
 
-    const base =
-        (process.env.REACT_APP_API_BASE || "http://localhost:8081").replace(/\/$/, "");
-
+    // sync initial value into the visible input (basic behavior)
     useEffect(() => {
-        const id = setTimeout(async () => {
-            if (!query || query.length < 2) { setOpts([]); return; }
+        if (value && !query) setQuery(value);
+    }, [value]); // I keep this simple on purpose
+
+    // close the dropdown if the user clicks outside
+    useEffect(() => {
+        const onDoc = (e) => { if (!boxRef.current?.contains(e.target)) setOpen(false); };
+        document.addEventListener("mousedown", onDoc);
+        return () => document.removeEventListener("mousedown", onDoc);
+    }, []);
+
+    // Debounce the search calls by 250ms when the query changes
+    useEffect(() => {
+        const t = setTimeout(async () => {
+            if (!query || query.length < 2) { setItems([]); return; }
             try {
-                const r = await fetch(`${base}/api/locations?keyword=${encodeURIComponent(query)}`);
-                const json = await r.json();
-                setOpts(extractLocations(json).slice(0, 8));
-                setOpen(true);
-            } catch {
-                setOpts([]); setOpen(false);
+                setLoading(true);
+                const r = await fetch(`${BASE}/api/locations?keyword=${encodeURIComponent(query)}`);
+                const data = (await r.json()) || [];
+                // normalize Amadeus' response into a friendly { code, display } format
+                const list = Array.isArray(data) ? data.map((loc) => {
+                    const iata = loc?.iataCode;
+                    const city = loc?.address?.cityName || loc?.name || iata;
+                    const state = loc?.address?.stateCode ? `, ${loc.address.stateCode}` : "";
+                    const country = loc?.address?.countryCode || "";
+                    const airportName = loc?.name || "";
+                    const display = `${city}${state}${!state && country ? ", " + country : ""} – ${airportName} (${iata})`;
+                    return iata ? { code: iata, display } : null;
+                }).filter(Boolean) : [];
+                setItems(list);
+            } catch (e) {
+                console.error(e);
+                setItems([]);
+            } finally {
+                setLoading(false);
             }
         }, 250);
-        return () => clearTimeout(id);
-    }, [query, base]);
+        return () => clearTimeout(t);
+    }, [query]);
 
-    const choose = (o) => {
-        setQuery(`${o.city} (${o.iata})`);
+    // Handle a user picking an item
+    const pick = (it) => {
+        onChange?.(it);           // send { code, display } upward
+        setQuery(it.display);     // show the friendly label in the input
         setOpen(false);
-        onPick && onPick(o.iata);
     };
 
     return (
-        <Wrap>
+        <Box ref={boxRef}>
+            <label>{label}</label>
             <input
-                value={query}
                 placeholder={placeholder}
-                onChange={(e) => { setQuery(e.target.value); setOpen(false); }}
-                onFocus={() => opts.length && setOpen(true)}
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                onFocus={() => setOpen(true)}
+                autoComplete="off"
             />
-            {open && opts.length > 0 && (
-                <Auto>
-                    {opts.map((o, i) => (
-                        <div key={i} className="opt" onMouseDown={() => choose(o)}>
-                            <strong>{o.city}</strong> &middot; {o.name} <span className="iata">{o.iata}</span>
-                        </div>
+            {open && (items.length > 0 || loading) && (
+                <List role="listbox">
+                    {loading && <li className="hint">Searching…</li>}
+                    {!loading && items.map((it) => (
+                        <li key={it.code} onClick={() => pick(it)}>
+                            <span className="name">{it.display}</span>
+                        </li>
                     ))}
-                </Auto>
+                    {!loading && items.length === 0 && query && <li className="hint">No matches</li>}
+                </List>
             )}
-        </Wrap>
+        </Box>
     );
 }
 
-/* Support both raw Amadeus wrapper and simplified arrays */
-function extractLocations(json) {
-    if (Array.isArray(json)) {
-        const holder = json.find((x) => x?.response?.result?.data);
-        if (holder) return holder.response.result.data.map(toLoc);
-    }
-    const data = json?.data || json;
-    if (Array.isArray(data)) return data.map(toLoc);
-    return [];
-}
-function toLoc(d) {
-    return {
-        iata: d.iataCode,
-        name: d.name || d.detailedName || "",
-        city: d.address?.cityName || d.address?.cityCode || "",
-        country: d.address?.countryName || d.address?.countryCode || "",
-    };
-}
-
 /* styles */
-const Wrap = styled.div`
-  position:relative;
-  input{width:100%;border:1px solid #e7eef6;border-radius:.8rem;padding:.85rem 1rem;font-size:1rem;background:#fbfdff;outline:none;transition:.2s;}
-  input:focus{border-color:#48cae4;box-shadow:0 0 0 3px rgba(72,202,228,.2);}
+const Box = styled.div`
+    position: relative; display: grid; gap: .35rem;
+    label { font-weight: 700; color: #0b7285; }
+    input {
+        border: 1px solid #e6edf5; border-radius: .65rem; padding: .6rem .75rem; font-size: 1rem;
+    }
 `;
-const Auto = styled.div`
-  position:absolute; top:3.1rem; left:0; right:0; background:#fff; border:1px solid #e7eef6;
-  border-radius:.8rem; box-shadow:0 14px 28px rgba(2,62,138,.08); z-index:5; max-height:240px; overflow:auto;
-  .opt{padding:.65rem .8rem; cursor:pointer; display:flex; gap:.4rem; align-items:center;}
-  .opt:hover{background:#f7fbff;}
-  .iata{margin-left:auto; font-weight:800; color:#0b7285;}
+const List = styled.ul`
+    position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px);
+    background: #fff; border: 1px solid #e6edf5; border-radius: .65rem;
+    max-height: 260px; overflow: auto; box-shadow: 0 12px 28px rgba(2,62,138,.08);
+    margin: 0; padding: .3rem; list-style: none;
+    li { padding: .55rem .6rem; border-radius: .5rem; cursor: pointer; }
+    li:hover { background: #f6fbff; }
+    .hint { color: #6b7280; cursor: default; }
+    .name { font-weight: 600; color: #0b7285; }
 `;

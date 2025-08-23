@@ -1,71 +1,74 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import { useHistory } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
+// keep using backend base URL from .env
+const BASE = (process.env.REACT_APP_API_BASE || "http://localhost:8081").replace(/\/$/, "");
+
+/**
+ * re-price the selected flight with Amadeus via /api/flights/confirm.
+ * - If the price comes back, let the user continue to /order
+ */
 export default function Confirm() {
-    const [offer, setOffer] = useState(null);
-    const history = useHistory();
+    const nav = useNavigate();
+    const { state } = useLocation();
+    const flight = state?.flight;
+    const [priced, setPriced] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [err, setErr] = useState("");
 
-    useEffect(() => {
-        // retrieve selection saved by Flight card
-        const raw = localStorage.getItem("selectedOffer");
-        if (raw) setOffer(JSON.parse(raw));
-    }, []);
+    if (!flight) return <Box error>I need a flight to confirm.</Box>;
 
-    const goOrder = () => history.push("/booking/order");
-
-    if (!offer) {
-        return (
-            <>
-                <Navbar bookingNav />
-                <Wrap><p>No selection. Go back to <a href="/booking">search</a>.</p></Wrap>
-                <Footer />
-            </>
-        );
-    }
-
-    const it = offer?.itineraries?.[0];
-    const dep = it?.segments?.[0]?.departure;
-    const arr = it?.segments?.slice(-1)[0]?.arrival;
+    // POST the whole flight object back to the backend for pricing
+    const confirm = async () => {
+        try {
+            setErr(""); setLoading(true);
+            const r = await fetch(`${BASE}/api/flights/confirm`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(flight),
+            });
+            if (!r.ok) throw new Error(await r.text());
+            const json = await r.json();
+            setPriced(json);
+        } catch (e) {
+            console.error(e);
+            setErr(e.message || "Confirm failed");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <>
-            <Navbar bookingNav />
-            <Wrap>
-                <Card>
-                    <h2>Confirm Flight</h2>
-                    <div className="row">
-                        <strong>{dep?.iataCode}</strong> ➜ <strong>{arr?.iataCode}</strong>
-                    </div>
-                    <div className="row small">
-                        Depart: {new Date(dep?.at).toLocaleString()} &middot; Arrive: {new Date(arr?.at).toLocaleString()}
-                    </div>
-                    <div className="row total">Total: ${offer?.price?.total}</div>
+        <Wrap>
+            <h2>Confirm price</h2>
+            <Box>
+                <div>Selected total: <strong>${flight?.price?.total ?? "—"}</strong></div>
+                <button disabled={loading} onClick={confirm}>{loading ? "Confirming…" : "Confirm with provider"}</button>
+            </Box>
+
+            {err && <Box error>{err}</Box>}
+
+            {priced && (
+                <Box>
+                    <div>Provider total: <strong>${priced?.data?.flightOffers?.[0]?.price?.total ?? priced?.data?.price?.total ?? "—"}</strong></div>
                     <Actions>
-                        <button className="secondary" onClick={() => history.push("/booking")}>Back</button>
-                        <button onClick={goOrder}>Continue</button>
+                        <button onClick={() => nav("/order", { state: { flight: priced }})}>Continue to travelers</button>
                     </Actions>
-                </Card>
-            </Wrap>
-            <Footer />
-        </>
+                </Box>
+            )}
+        </Wrap>
     );
 }
 
-const Wrap = styled.main`
-  max-width: 900px; margin: 2rem auto; padding: 0 1rem;
+/* styles */
+const Wrap = styled.div`max-width:900px; margin:0 auto; padding:1rem;`;
+const Box = styled.div`
+    margin-top: .9rem; background:${p=>p.error ? "#fef2f2" : "#fff"};
+    border:1px solid ${p=>p.error ? "#fecaca" : "#e6edf5"}; border-radius:.9rem; padding:.9rem;
+    color:${p=>p.error ? "#b91c1c" : "inherit"};
+    display:grid; gap:.6rem;
+    button{ background:#0ea5e9; color:#fff; border:0; border-radius:.7rem; padding:.6rem .9rem; cursor:pointer; font-weight:700; }
 `;
-const Card = styled.section`
-  background:#fff;border-radius:1rem;border:1px solid #e7eef6;box-shadow:0 12px 28px rgba(2,62,138,.08);padding:1.2rem;
-  h2{margin-top:0}
-  .row{margin:.5rem 0;font-size:1.05rem}
-  .row.small{opacity:.8}
-  .row.total{font-weight:900;color:#0b7285}
-`;
-const Actions = styled.div`
-  display:flex; gap:.5rem; margin-top:1rem;
-  button{background:#0b7285;color:#fff;border:none;border-radius:999px;padding:.6rem 1rem;font-weight:700;cursor:pointer}
-  .secondary{background:#e7eef6;color:#0b7285}
-`;
+const Actions = styled.div`display:flex; justify-content:flex-end;`;
+

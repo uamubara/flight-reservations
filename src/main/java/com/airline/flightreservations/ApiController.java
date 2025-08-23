@@ -90,11 +90,12 @@ public class ApiController {
             @RequestParam String adults,
             @RequestParam(required = false) String returnDate,
             @RequestParam(defaultValue = "5") int maxResults,
-            @RequestParam(defaultValue = "false") boolean raw
+            @RequestParam(defaultValue = "false") boolean raw,
+            @RequestParam(defaultValue = "USD") String currencyCode
     ) {
         try {
             FlightOfferSearch[] offers = amadeusConnect.flights(
-                    origin, destination, departDate, adults, returnDate, maxResults
+                    origin, destination, departDate, adults, returnDate, maxResults, currencyCode
             );
 
             if (raw) {

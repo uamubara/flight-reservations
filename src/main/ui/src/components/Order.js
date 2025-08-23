@@ -1,49 +1,98 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
+import { useLocation } from "react-router-dom";
 
+// keep reusing my env base URL
+const BASE = (process.env.REACT_APP_API_BASE || "http://localhost:8081").replace(/\/$/, "");
+
+/**
+ * Collect minimal traveler info and try to place an order.
+ * - POST traveler to /api/traveler (matches your backend DTO)
+ * - Then POST the order payload to /api/bookings/order
+ */
 export default function Order() {
-    const [offer, setOffer] = useState(null);
-    const [placing, setPlacing] = useState(false);
+    const { state } = useLocation();
+    const priced = state?.flight;
 
-    useEffect(() => {
-        const raw = localStorage.getItem("selectedOffer");
-        if (raw) setOffer(JSON.parse(raw));
-    }, []);
+    const [form, setForm] = useState({
+        fname: "", lname: "", dob: "", phoneNumber: "",
+        nationality: "", passportNumber: "", expiryDate: ""
+    });
+    const [result, setResult] = useState("");
+    const [loading, setLoading] = useState(false);
 
+    // keep a tiny field updater around to avoid repetition
+    const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+    // create a traveler via the backend. so it returns a Traveler object compatible with Amadeus
+    const saveTraveler = async () => {
+        const r = await fetch(`${BASE}/api/traveler`, {
+            method: "POST", headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+                fname: form.fname, lname: form.lname, dob: form.dob,
+                phoneNumber: form.phoneNumber, nationality: form.nationality,
+                passportNumber: form.passportNumber, expiryDate: form.expiryDate
+            })
+        });
+        return r.ok ? r.json() : Promise.reject(await r.text());
+    };
+
+    // stitch the final order payload and POST it to /api/bookings/order
     const placeOrder = async () => {
-        if (!offer) return;
-        setPlacing(true);
         try {
-            // Example next steps:
-            // 1) POST /api/flights/confirm with the selected offer
-            // 2) POST /api/bookings/order with traveler + confirmed offer
-            alert("Order placed (wire to API next).");
+            setLoading(true);
+            const traveler = await saveTraveler();
+            const orderPayload = {
+                data: {
+                    type: "flight-order",
+                    flightOffers: priced?.data?.flightOffers || [priced?.data || priced],
+                    travelers: [traveler]
+                }
+            };
+            const r = await fetch(`${BASE}/api/bookings/order`, {
+                method: "POST", headers: {"Content-Type":"application/json"},
+                body: JSON.stringify(orderPayload)
+            });
+            setResult(r.ok ? "Order placed!" : `Order failed: ${await r.text()}`);
+        } catch (e) {
+            setResult(e?.message || "Order failed");
         } finally {
-            setPlacing(false);
+            setLoading(false);
         }
     };
 
     return (
-        <>
-            <Navbar bookingNav />
-            <Wrap>
-                <h2>Passenger & Payment</h2>
-                <p>Wire this form to your `/api/traveler`, `/api/flights/confirm`, and `/api/bookings/order`.</p>
-                <div className="box">
-                    <button disabled={!offer || placing} onClick={placeOrder}>
-                        {placing ? "Placing…" : "Place Order"}
-                    </button>
-                </div>
-            </Wrap>
-            <Footer />
-        </>
+        <Wrap>
+            <h2>Traveler details</h2>
+            <Grid as="form" onSubmit={(e)=>{e.preventDefault(); placeOrder();}}>
+                <Field><label>First name</label><input value={form.fname} onChange={update("fname")} required /></Field>
+                <Field><label>Last name</label><input value={form.lname} onChange={update("lname")} required /></Field>
+                <Field><label>Date of birth</label><input type="date" value={form.dob} onChange={update("dob")} required /></Field>
+                <Field><label>Phone</label><input value={form.phoneNumber} onChange={update("phoneNumber")} /></Field>
+                <Field><label>Nationality</label><input value={form.nationality} onChange={update("nationality")} /></Field>
+                <Field><label>Passport #</label><input value={form.passportNumber} onChange={update("passportNumber")} /></Field>
+                <Field><label>Expiry date</label><input type="date" value={form.expiryDate} onChange={update("expiryDate")} /></Field>
+                <Actions><button type="submit" disabled={loading}>{loading ? "Placing order…" : "Place order"}</button></Actions>
+            </Grid>
+            {result && <Note>{result}</Note>}
+        </Wrap>
     );
 }
 
-const Wrap = styled.main`
-  max-width: 900px; margin: 2rem auto; padding: 0 1rem;
-  .box{background:#fff;border:1px solid #e7eef6;border-radius:1rem;padding:1rem;box-shadow:0 12px 28px rgba(2,62,138,.08)}
-  button{background:#0b7285;color:#fff;border:none;border-radius:999px;padding:.7rem 1.2rem;font-weight:800;cursor:pointer}
+/* styles */
+const Wrap = styled.div`max-width:900px; margin:0 auto; padding:1rem;`;
+const Grid = styled.div`
+  display:grid; gap:.8rem; grid-template-columns: 1fr 1fr;
+  @media (max-width: 720px){ grid-template-columns: 1fr; }
 `;
+const Field = styled.div`
+  display:grid; gap:.35rem;
+  label { font-weight:700; color:#0b7285; }
+  input { border:1px solid #e6edf5; border-radius:.65rem; padding:.6rem .75rem; font-size:1rem; }
+`;
+const Actions = styled.div`
+  grid-column: 1 / -1; display:flex; justify-content:flex-end;
+  button{ background:#0ea5e9; color:#fff; border:0; border-radius:.7rem; padding:.7rem 1rem; cursor:pointer; font-weight:700; }
+`;
+const Note = styled.div`margin-top: .8rem; font-weight:700; color:#0b7285;`;
+
