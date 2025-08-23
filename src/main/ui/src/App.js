@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import Scrollreveal from "scrollreveal";
-import Booking from "./components/Booking";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
 import Navbar from "./components/Navbar";
@@ -17,18 +16,20 @@ export default function App() {
             duration: 2000,
             reset: true,
         });
-        sr.reveal(`
+        sr.reveal(
+            `
       nav,
       #hero,
       #services,
       #recommended,
       #reviews,
-      #Booking
       footer
-    `, {
-            opacity: 0,
-            interval: 300,
-        });
+    `,
+            {
+                opacity: 0,
+                interval: 300,
+            }
+        );
     }, []);
 
     return (
@@ -39,7 +40,6 @@ export default function App() {
             <Services />
             <Recommended />
             <Reviews />
-            <Booking />
             <Footer />
         </div>
     );

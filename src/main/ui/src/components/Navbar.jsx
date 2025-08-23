@@ -5,7 +5,7 @@ import styled from "styled-components";
 import logo from "../assets/logo.png";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { VscChromeClose } from "react-icons/vsc";
-import Booking from "./Booking";
+
 export default function Navbar() {
     const [navbarState, setNavbarState] = useState(false);
     return (
@@ -39,8 +39,11 @@ export default function Navbar() {
                         <a href="#testimonials">REVIEWS</a>
                     </li>
                 </ul>
-                    <button>Book Flight</button>
+
+
+                <Link to="/book" className="book-btn">Book Flight</Link>
             </Nav>
+
             <ResponsiveNav state={navbarState}>
                 <ul>
                     <li>
@@ -53,19 +56,16 @@ export default function Navbar() {
                             ABOUT
                         </a>
                     </li>
-
                     <li>
                         <a href="#recommended" onClick={() => setNavbarState(false)}>
                             DESTINATIONS
                         </a>
                     </li>
-
                     <li>
                         <a href="#reviews" onClick={() => setNavbarState(false)}>
                             REVIEWS
                         </a>
                     </li>
-
                 </ul>
             </ResponsiveNav>
         </>
@@ -86,7 +86,6 @@ const Nav = styled.nav`
       font-size: 1.2rem;
       font-weight: 900;
       text-transform: uppercase;
-      
     }
     .toggle {
       display: none;
@@ -114,7 +113,9 @@ const Nav = styled.nav`
       }
     }
   }
-  button {
+    
+  .book-btn {
+    display: inline-block;
     padding: 0.5rem 1rem;
     cursor: pointer;
     border-radius: 1rem;
@@ -125,10 +126,12 @@ const Nav = styled.nav`
     letter-spacing: 0.1rem;
     text-transform: uppercase;
     transition: 0.3s ease-in-out;
-    &:hover {
-      background-color: #023e8a;
-    }
+    text-decoration: none;
   }
+  .book-btn:hover {
+    background-color: #023e8a;
+  }
+
   @media screen and (min-width: 280px) and (max-width: 1080px) {
     .brand {
       display: flex;
@@ -142,7 +145,8 @@ const Nav = styled.nav`
     ul {
       display: none;
     }
-    button {
+    /* Hide the link on mobile same as old button */
+    .book-btn {
       display: none;
     }
   }

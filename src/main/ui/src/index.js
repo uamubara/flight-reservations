@@ -1,16 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { BrowserRouter as Router } from 'react-router-dom';
-import { createBrowserHistory } from 'history';
-import App from './App';
-import './index.css'; // import CSS file
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-const history = createBrowserHistory();
+import App from './App';                    // landing page
+import Booking from './components/Booking'; // booking page component
+import './index.css';
 
 ReactDOM.render(
     <React.StrictMode>
-        <Router history={history}>
-            <App />
+        <Router>
+            <Routes>
+                <Route path="/" element={<App />} />
+                <Route path="/book" element={<Booking />} />
+            </Routes>
         </Router>
     </React.StrictMode>,
     document.getElementById('root')
