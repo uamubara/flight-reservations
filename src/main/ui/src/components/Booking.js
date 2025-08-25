@@ -9,38 +9,48 @@ import { useNavigate } from "react-router-dom";
 const BASE = (process.env.REACT_APP_API_BASE || "http://localhost:8081").replace(/\/$/, "");
 
 export default function Booking() {
-    // hold search results + simple UI state
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [filterNonStopOnly, setFilterNonStopOnly] = useState(false);
+    const [lastQuery, setLastQuery] = useState(null);
 
     const navigate = useNavigate();
 
-    // when a user taps a card, push them to /confirm with the offer in state
-    const handleSelectOffer = (offer) => {
-        navigate("/confirm", { state: { offer } });
+    const handleSelectOffer = (rawOffer) => {
+        navigate("/confirm", { state: { offer: rawOffer } });
     };
 
-    // call /api/flights on the Spring side with the form payload
     const onSearch = async (payload) => {
         try {
             setError("");
             setLoading(true);
             setResults([]);
+            setLastQuery(payload);
 
             const qs = new URLSearchParams({
                 origin: payload.origin,
                 destination: payload.destination,
                 departDate: payload.departDate,
-                adults: String(payload.adults || 1),
+                adults: String(payload.adults || 0),
+                ...(payload.children > 0 && { children: String(payload.children) }),
+                ...(payload.infants > 0 && { infants: String(payload.infants) }),
                 ...(payload.returnDate ? { returnDate: payload.returnDate } : {}),
+                ...(payload.travelClass ? { travelClass: payload.travelClass } : {}),
                 maxResults: "10",
                 currencyCode: "USD"
             });
 
             const r = await fetch(`${BASE}/api/flights?${qs.toString()}`);
-            if (!r.ok) throw new Error(await r.text());
+            if (!r.ok) {
+                const errText = await r.text();
+                try {
+                    const errJson = JSON.parse(errText);
+                    throw new Error(errJson.details || errJson.error || "Search failed");
+                } catch {
+                    throw new Error(errText || "Search failed");
+                }
+            }
             const json = await r.json();
             setResults(Array.isArray(json) ? json : []);
         } catch (e) {
@@ -51,15 +61,8 @@ export default function Booking() {
         }
     };
 
-    // count stops from the itineraries,  split into featured vs other
-    const stopsCount = (f) =>
-        (f?.itineraries || []).reduce(
-            (sum, it) => sum + Math.max(0, (it?.segments?.length || 0) - 1),
-            0
-        );
-
-    const nonStop = results.filter((f) => stopsCount(f) === 0);
-    const others = results.filter((f) => stopsCount(f) > 0);
+    const nonStop = results.filter((f) => f.numberOfStops === 0);
+    const others = results.filter((f) => f.numberOfStops > 0);
     const visibleOthers = filterNonStopOnly ? [] : others;
 
     return (
@@ -72,12 +75,10 @@ export default function Booking() {
             </Header>
 
             <Main>
-                {/* Keep form in a raised panel */}
                 <Panel>
                     <Locate onSearch={onSearch} />
                 </Panel>
 
-                {/* tiny toolbar: count + non-stop filter */}
                 <Tools>
                     <div className="left">
                         <strong>Results</strong>
@@ -101,42 +102,38 @@ export default function Booking() {
                     <StateBox>Try a search to see flights.</StateBox>
                 )}
 
-                {/* Feature: non-stop block first */}
                 {!loading && !error && nonStop.length > 0 && (
                     <Featured>
                         <div className="title">
                             <h2>Non-stop options</h2>
                             <Badge tone="green">Non-stop</Badge>
                         </div>
-
-                        {/* render the cards with <Flight /> and send clicks to /confirm */}
                         <Flight
                             offers={nonStop}
-                            showOnlyNonStop={false} // I already filtered this list to non-stop
+                            showOnlyNonStop={false}
                             onSelectOffer={handleSelectOffer}
+                            meta={lastQuery}
                         />
                     </Featured>
                 )}
 
-                {/*  show all the results (unless the user turned on “Show only non-stop”) */}
                 {!loading && !error && visibleOthers.length > 0 && (
                     <Section>
                         <h2>More options</h2>
                         <Flight
                             offers={visibleOthers}
-                            showOnlyNonStop={false} // this list can include stops
+                            showOnlyNonStop={false}
                             onSelectOffer={handleSelectOffer}
+                            meta={lastQuery}
                         />
                     </Section>
                 )}
             </Main>
 
-            {/* Partner logos (mobile + desktop friendly) */}
             <Partners aria-label="Partner airlines">
                 <div className="wrap">
                     <h3>Our Airline Partners</h3>
                     <div className="logos">
-                        {/* placeholders for now */}
                         <span>Delta</span>
                         <span>United</span>
                         <span>American</span>
@@ -199,6 +196,10 @@ const Tools = styled.div`
         color: #64748b;
         margin-left: 0.3rem;
     }
+    /* --- CORRECTED: Change color for "Results" text --- */
+    strong {
+        color: #0b7285;
+    }
     .switch {
         display: flex;
         align-items: center;
@@ -219,6 +220,7 @@ const StateBox = styled.div`
     border-radius: 0.8rem;
     padding: 0.9rem;
     font-weight: 700;
+    white-space: pre-wrap;
 `;
 
 const Featured = styled.section`
@@ -229,11 +231,19 @@ const Featured = styled.section`
         align-items: center;
         gap: 0.6rem;
     }
+    /* --- CORRECTED: Change color for "Non-stop options" text --- */
+    h2 {
+        color: #0b7285;
+    }
 `;
 
 const Section = styled.section`
     display: grid;
     gap: 0.6rem;
+    /* --- CORRECTED: Change color for "More options" text --- */
+    h2 {
+        color: #0b7285;
+    }
 `;
 
 const Partners = styled.section`

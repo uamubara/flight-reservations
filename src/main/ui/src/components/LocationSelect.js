@@ -5,23 +5,20 @@ import styled from "styled-components";
 const BASE = (process.env.REACT_APP_API_BASE || "http://localhost:8081").replace(/\/$/, "");
 
 /**
- *   use this controlled component anywhere I need an airport picker.
- * - When user begins to type, fetch /api/locations?keyword=...
- * - render "City, ST – Airport (IATA)" in the dropdown
- * - When the user picks an option,  pass { code, display } back up via onChange
+ * A controlled autocomplete component for airport selection.
+ * - It receives a `value` object { code, display } and an `onChange` function from its parent.
+ * - The input field's text is always sourced from `value.display`.
+ * - When the user types, it calls `onChange` to update the parent, clearing the airport `code`.
+ * - When the user picks an item, it calls `onChange` with the complete { code, display } object.
  */
 export default function LocationSelect({ label, placeholder, value, onChange }) {
-    // value is the current IATA code. I'll keep a pretty string separately for the input.
-    const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const boxRef = useRef(null);
 
-    // sync initial value into the visible input (basic behavior)
-    useEffect(() => {
-        if (value && !query) setQuery(value);
-    }, [value]); // I keep this simple on purpose
+    // The text to search for is derived directly from the parent's state
+    const query = value?.display || "";
 
     // close the dropdown if the user clicks outside
     useEffect(() => {
@@ -30,7 +27,7 @@ export default function LocationSelect({ label, placeholder, value, onChange }) 
         return () => document.removeEventListener("mousedown", onDoc);
     }, []);
 
-    // Debounce the search calls by 250ms when the query changes
+    // Debounce the search calls by 250ms when the query text changes
     useEffect(() => {
         const t = setTimeout(async () => {
             if (!query || query.length < 2) { setItems([]); return; }
@@ -61,8 +58,7 @@ export default function LocationSelect({ label, placeholder, value, onChange }) 
 
     // Handle a user picking an item
     const pick = (it) => {
-        onChange?.(it);           // send { code, display } upward
-        setQuery(it.display);     // show the friendly label in the input
+        onChange?.(it);           // send the complete { code, display } object upward
         setOpen(false);
     };
 
@@ -71,8 +67,13 @@ export default function LocationSelect({ label, placeholder, value, onChange }) 
             <label>{label}</label>
             <input
                 placeholder={placeholder}
-                value={query}
-                onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                value={value?.display || ""} // Input is now fully controlled by the parent's `display` property
+                onChange={(e) => {
+                    // When user types, immediately update the parent state.
+                    // This clears the airport `code`, ensuring validation works correctly.
+                    onChange?.({ code: "", display: e.target.value });
+                    setOpen(true);
+                }}
                 onFocus={() => setOpen(true)}
                 autoComplete="off"
             />

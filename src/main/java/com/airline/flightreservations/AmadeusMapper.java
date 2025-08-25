@@ -2,14 +2,14 @@ package com.airline.flightreservations;
 
 import com.airline.flightreservations.dto.*;
 import com.amadeus.resources.*;
-import java.util.*;
-import java.util.stream.Collectors;
-import com.amadeus.resources.FlightOfferSearch;
-import com.amadeus.resources.FlightOfferSearch.Itinerary;
-import com.amadeus.resources.FlightOfferSearch.SearchSegment;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
-/** Maps Amadeus SDK objects to DTOs (faster JSON, stable shape) */
+/** Maps Amadeus SDK objects to our rich DTO for the frontend. */
 final class AmadeusMapper {
     private AmadeusMapper() {}
 
@@ -30,58 +30,64 @@ final class AmadeusMapper {
         return out;
     }
 
-    static List<FlightOfferDTO> toFlightOfferDTOs(FlightOfferSearch[] offers) {
+    /**
+     * Creates a list of rich FlightOfferDTOs.
+     * @param offers The original offers from the Amadeus SDK.
+     * @param airlineNames A map of IATA codes to airline names for enrichment.
+     * @param rawOffers A list of raw JsonNode objects for passthrough to the confirmation step.
+     * @return A list of DTOs ready for the frontend.
+     */
+    static List<FlightOfferDTO> toFlightOfferDTOs(FlightOfferSearch[] offers, Map<String, String> airlineNames, List<JsonNode> rawOffers) {
         if (offers == null) return List.of();
         List<FlightOfferDTO> out = new ArrayList<>();
-        for (FlightOfferSearch offer : offers) {
+
+        for (int i = 0; i < offers.length; i++) {
+            FlightOfferSearch offer = offers[i];
             if (offer == null) continue;
 
             FlightOfferDTO dto = new FlightOfferDTO();
-            try { dto.id = offer.getId(); } catch (Exception ignored) {}
+            // Attach the raw JSON. This is critical for a stateless confirmation process.
+            dto.rawOffer = rawOffers.get(i);
 
-            // price
-            PriceDTO price = new PriceDTO();
-            try { price.total = String.valueOf(offer.getPrice().getTotal()); } catch (Exception ignored) {}
-            try { price.currency = offer.getPrice().getCurrency(); } catch (Exception ignored) {}
-            dto.price = price;
-
-            // validating airlines
             try {
-                String[] codes = offer.getValidatingAirlineCodes();
-                dto.validatingAirlines = (codes == null) ? List.of() : Arrays.asList(codes);
-            } catch (Exception ignored) {}
+                // --- Populate Original Detailed Structure ---
+                dto.id = offer.getId();
+                PriceDTO price = new PriceDTO();
+                price.total = String.valueOf(offer.getPrice().getTotal());
+                price.currency = offer.getPrice().getCurrency();
+                dto.price = price;
 
-            // itineraries
-            try {
-                FlightOfferSearch.Itinerary[] its = offer.getItineraries();
-                if (its != null) {
-                    dto.itineraries = Arrays.stream(its).map(it -> {
-                        ItineraryDTO itDto = new ItineraryDTO();
-                        try { itDto.duration = it.getDuration(); } catch (Exception ignored) {}
+                // --- Populate New Summary Fields ---
+                if (offer.getItineraries() != null && offer.getItineraries().length > 0) {
+                    FlightOfferSearch.Itinerary firstItinerary = offer.getItineraries()[0];
+                    dto.duration = firstItinerary.getDuration();
 
-                        try {
-                            FlightOfferSearch.SearchSegment[] segs = it.getSegments();
-                            if (segs != null) {
-                                itDto.segments = Arrays.stream(segs).map(s -> {
-                                    SegmentDTO sDto = new SegmentDTO();
-                                    try { sDto.carrierCode = s.getCarrierCode(); } catch (Exception ignored) {}
-                                    try { sDto.flightNumber = s.getNumber(); } catch (Exception ignored) {}
-                                    try { sDto.departureIata = s.getDeparture().getIataCode(); } catch (Exception ignored) {}
-                                    try { sDto.departureAt = s.getDeparture().getAt(); } catch (Exception ignored) {}
-                                    try { sDto.arrivalIata = s.getArrival().getIataCode(); } catch (Exception ignored) {}
-                                    try { sDto.arrivalAt = s.getArrival().getAt(); } catch (Exception ignored) {}
-                                    try { sDto.duration = s.getDuration(); } catch (Exception ignored) {}
-                                    try { sDto.numberOfStops = s.getNumberOfStops(); } catch (Exception ignored) {}
-                                    return sDto;
-                                }).collect(Collectors.toList());
-                            }
-                        } catch (Exception ignored) {}
+                    if (firstItinerary.getSegments() != null && firstItinerary.getSegments().length > 0) {
+                        FlightOfferSearch.SearchSegment firstSegment = firstItinerary.getSegments()[0];
+                        FlightOfferSearch.SearchSegment lastSegment = firstItinerary.getSegments()[firstItinerary.getSegments().length - 1];
 
-                        return itDto;
-                    }).collect(Collectors.toList());
+                        String carrierCode = firstSegment.getCarrierCode();
+                        dto.carrierCode = carrierCode;
+                        // Enrich with the full airline name fetched earlier.
+                        dto.airlineName = airlineNames.getOrDefault(carrierCode, carrierCode);
+                        dto.flightNumber = firstSegment.getNumber();
+                        dto.numberOfStops = Math.max(0, firstItinerary.getSegments().length - 1);
+                        dto.originCode = firstSegment.getDeparture().getIataCode();
+                        dto.destinationCode = lastSegment.getArrival().getIataCode();
+                        dto.departureTime = firstSegment.getDeparture().getAt();
+                        dto.arrivalTime = lastSegment.getArrival().getAt();
+                    }
                 }
-            } catch (Exception ignored) {}
 
+                if (offer.getTravelerPricings() != null && offer.getTravelerPricings().length > 0) {
+                    FlightOfferSearch.TravelerPricing travelerPricing = offer.getTravelerPricings()[0];
+                    if (travelerPricing.getFareDetailsBySegment() != null && travelerPricing.getFareDetailsBySegment().length > 0) {
+                        dto.cabin = travelerPricing.getFareDetailsBySegment()[0].getCabin();
+                    }
+                }
+            } catch (Exception ignored) {
+                // Be resilient to unexpected changes in the Amadeus response.
+            }
             out.add(dto);
         }
         return out;
