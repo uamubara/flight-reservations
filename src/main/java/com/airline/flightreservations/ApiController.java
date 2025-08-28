@@ -1,35 +1,41 @@
 package com.airline.flightreservations;
 
-import com.airline.flightreservations.dto.TravelerDTO;
+import com.airline.flightreservations.dto.AirportDTO;
 import com.airline.flightreservations.dto.FlightOfferDTO;
 import com.airline.flightreservations.dto.LocationDTO;
-import com.airline.flightreservations.dto.AirportDTO;
-
+import com.airline.flightreservations.dto.TravelerDTO;
 import com.amadeus.exceptions.ResponseException;
 import com.amadeus.resources.FlightOfferSearch;
+import com.amadeus.resources.FlightOrder;
 import com.amadeus.resources.FlightPrice;
 import com.amadeus.resources.Location;
 import com.amadeus.resources.Traveler;
-import com.amadeus.resources.FlightOrder;
-import com.google.gson.JsonObject;
-
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-
+import com.google.gson.JsonObject;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import javax.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import javax.validation.Valid;
 import org.springframework.validation.BindingResult;
-
-import java.util.*;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api")
@@ -137,8 +143,6 @@ public class ApiController {
             List<JsonNode> rawOffersList = new ArrayList<>();
 
             if (offers != null && offers.length > 0) {
-                // --- THIS IS THE CORRECTED LINE ---
-                // Convert the Amadeus SDK's Gson object to a String before parsing it with Jackson's ObjectMapper.
                 JsonNode rawResultNode = objectMapper.readTree(offers[0].getResponse().getResult().toString());
                 ArrayNode dataArray = (ArrayNode) rawResultNode.get("data");
                 if (dataArray != null) {
@@ -185,27 +189,39 @@ public class ApiController {
         return map;
     }
 
-    @PostMapping("/flights/confirm")
-    public ResponseEntity<?> confirm(@RequestBody JsonNode offerJson) {
+    @PostMapping("/api/flights/confirm")
+    public ResponseEntity<?> confirm(@RequestBody Map<String, Object> body) {
         try {
-            FlightOfferSearch selectedOffer = objectMapper.treeToValue(offerJson, FlightOfferSearch.class);
-            FlightPrice priced = amadeusConnect.confirm(selectedOffer);
-
-            if (priced != null && priced.getResponse() != null) {
-                String json = priced.getResponse().getResult().toString();
-                Object asMap = objectMapper.readValue(json, Object.class);
-                return ResponseEntity.ok(asMap);
+            // Extract the offer regardless of shape (direct or wrapped in data[])
+            Object offerObj = body;
+            Object dataNode = body.get("data");
+            if (dataNode instanceof java.util.List && !((java.util.List<?>) dataNode).isEmpty()) {
+                offerObj = ((java.util.List<?>) dataNode).get(0);
+            } else if (dataNode instanceof java.util.Map) {
+                offerObj = dataNode; // sometimes APIs send { data: { ...offer... } }
             }
+
+            com.google.gson.Gson gson = new com.google.gson.Gson();
+            com.google.gson.JsonObject offerJson =
+                    gson.toJsonTree(offerObj).getAsJsonObject();
+
+            // Call the corrected helper (uses flightOffersSearch.pricing)
+            com.google.gson.JsonObject priced = amadeusConnect.priceOffer(offerJson);
+
+            // Return as a plain Map so the front-end can read it
+            Object asMap = objectMapper.readValue(priced.toString(), Object.class);
+            return ResponseEntity.ok(asMap);
+
+        } catch (com.amadeus.exceptions.ResponseException re) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Empty pricing response"));
-        } catch (ResponseException re) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Error confirming price", "details", re.getMessage()));
+                    .body(java.util.Map.of("error", "Failed to price offer", "details", re.getMessage()));
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to process pricing", "details", ex.getMessage()));
+                    .body(java.util.Map.of("error", "Unexpected error", "details", ex.getMessage()));
         }
     }
+
+
 
     @PostMapping("/traveler")
     public ResponseEntity<?> traveler(

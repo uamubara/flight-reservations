@@ -12,6 +12,8 @@ import com.amadeus.resources.Location;
 
 import com.airline.flightreservations.dto.AirportDTO;
 import com.google.gson.JsonObject;
+import com.google.gson.Gson;
+
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -119,6 +121,24 @@ public class AmadeusConnect {
     public FlightPrice confirm(FlightOfferSearch offer) throws ResponseException {
         return amadeus.shopping.flightOffersSearch.pricing.post(offer);
     }
+
+
+
+    public JsonObject priceOffer(JsonObject rawOffer) throws ResponseException {
+        // Convert the raw JSON into the SDK type the pricing API expects
+        FlightOfferSearch offer = new Gson().fromJson(rawOffer, FlightOfferSearch.class);
+
+        // endpoint
+        FlightPrice priced = amadeus.shopping.flightOffersSearch.pricing.post(offer);
+
+        // Hand the raw JSON back to the controller
+        if (priced != null && priced.getResponse() != null) {
+            return priced.getResponse().getResult();
+        }
+        return new JsonObject();
+    }
+
+
 
     public FlightOrder order(JsonObject order) throws ResponseException {
         return amadeus.booking.flightOrders.post(order);

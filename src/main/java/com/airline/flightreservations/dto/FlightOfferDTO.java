@@ -13,14 +13,14 @@ import java.util.List;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class FlightOfferDTO {
-    // --- Original Detailed Structure ---
+
     public String id;
     public PriceDTO price;
     public List<String> validatingAirlines;
     public List<ItineraryDTO> itineraries;
-    public JsonNode rawOffer; // The raw Amadeus JSON, essential for the stateless booking flow
+    public JsonNode rawOffer; // The raw Amadeus JSON, for the stateless booking flow
 
-    // --- New Summary Fields for UI Convenience ---
+    // --- Summary Fields for UI  ---
     public String airlineName;
     public String carrierCode;
     public String flightNumber;
@@ -31,5 +31,7 @@ public class FlightOfferDTO {
     public String destinationCode;
     public String departureTime;
     public String arrivalTime;
+
+
 }
 

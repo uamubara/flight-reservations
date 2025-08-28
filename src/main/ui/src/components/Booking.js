@@ -17,6 +17,7 @@ export default function Booking() {
 
     const navigate = useNavigate();
 
+    // This function will be used to navigate to the confirmation page
     const handleSelectOffer = (rawOffer) => {
         navigate("/confirm", { state: { offer: rawOffer } });
     };
@@ -110,9 +111,7 @@ export default function Booking() {
                         </div>
                         <Flight
                             offers={nonStop}
-                            showOnlyNonStop={false}
                             onSelectOffer={handleSelectOffer}
-                            meta={lastQuery}
                         />
                     </Featured>
                 )}
@@ -122,9 +121,7 @@ export default function Booking() {
                         <h2>More options</h2>
                         <Flight
                             offers={visibleOthers}
-                            showOnlyNonStop={false}
                             onSelectOffer={handleSelectOffer}
-                            meta={lastQuery}
                         />
                     </Section>
                 )}
@@ -196,7 +193,6 @@ const Tools = styled.div`
         color: #64748b;
         margin-left: 0.3rem;
     }
-    /* --- CORRECTED: Change color for "Results" text --- */
     strong {
         color: #0b7285;
     }
@@ -231,7 +227,6 @@ const Featured = styled.section`
         align-items: center;
         gap: 0.6rem;
     }
-    /* --- CORRECTED: Change color for "Non-stop options" text --- */
     h2 {
         color: #0b7285;
     }
@@ -240,7 +235,6 @@ const Featured = styled.section`
 const Section = styled.section`
     display: grid;
     gap: 0.6rem;
-    /* --- CORRECTED: Change color for "More options" text --- */
     h2 {
         color: #0b7285;
     }
