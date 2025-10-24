@@ -9,16 +9,13 @@ import com.amadeus.resources.FlightOfferSearch;
 import com.amadeus.resources.FlightOrder;
 import com.amadeus.resources.FlightPrice;
 import com.amadeus.resources.Location;
-
 import com.airline.flightreservations.dto.AirportDTO;
-import com.google.gson.JsonObject;
 import com.google.gson.Gson;
-
-
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-
 
 @Component
 public class AmadeusConnect {
@@ -35,11 +32,17 @@ public class AmadeusConnect {
         this.amadeus = Amadeus.builder(apiKey.trim(), apiSecret.trim()).build();
     }
 
-
     public Location[] location(String keyword) throws ResponseException {
         return amadeus.referenceData.locations.get(
                 Params.with("keyword", keyword)
                         .and("subType", Locations.AIRPORT)
+        );
+    }
+
+    public Location[] nearestAirport(double latitude, double longitude) throws ResponseException {
+        return amadeus.referenceData.locations.airports.get(
+                Params.with("latitude", latitude)
+                        .and("longitude", longitude)
         );
     }
 
@@ -68,13 +71,11 @@ public class AmadeusConnect {
         return toAirportDTO(results[0]);
     }
 
-
     public FlightOfferSearch[] flights(
             String origin,
             String destination,
             String departDate,
             String adults,
-            // --- Add children and infants parameters ---
             int children,
             int infants,
             String returnDate,
@@ -89,7 +90,6 @@ public class AmadeusConnect {
                 .and("adults", adults)
                 .and("max", maxResults);
 
-        // --- NEW: Add children and infants to the API request if they are greater than 0 ---
         if (children > 0) {
             params.and("children", children);
         }
@@ -113,32 +113,41 @@ public class AmadeusConnect {
         return amadeus.shopping.flightOffersSearch.get(params);
     }
 
-
     public Airline[] airlines(String codesCsv) throws ResponseException {
         return amadeus.referenceData.airlines.get(Params.with("airlineCodes", codesCsv));
     }
 
-    public FlightPrice confirm(FlightOfferSearch offer) throws ResponseException {
-        return amadeus.shopping.flightOffersSearch.pricing.post(offer);
-    }
-
-
+    // This method is in AmadeusConnect.java
 
     public JsonObject priceOffer(JsonObject rawOffer) throws ResponseException {
-        // Convert the raw JSON into the SDK type the pricing API expects
-        FlightOfferSearch offer = new Gson().fromJson(rawOffer, FlightOfferSearch.class);
+        // Create the main request body object that the Amadeus Pricing API expects.
+        JsonObject requestBody = new JsonObject();
+        JsonObject data = new JsonObject();
 
-        // endpoint
-        FlightPrice priced = amadeus.shopping.flightOffersSearch.pricing.post(offer);
+        // Set the required "type" for a pricing request.
+        data.addProperty("type", "flight-offers-pricing");
 
-        // Hand the raw JSON back to the controller
+        // Create a JsonArray to hold the flight offers.
+        JsonArray flightOffers = new JsonArray();
+
+        // Parse the rawOffer object into a JsonElement before adding it.
+        flightOffers.add(new Gson().fromJson(rawOffer, JsonElement.class));
+
+        // Add the flightOffers array to the data object.
+        data.add("flightOffers", flightOffers);
+
+        // Add the data object to the main request body.
+        requestBody.add("data", data);
+
+        // Send the structured request to the flightOffersSearch.pricing endpoint.
+        FlightPrice priced = amadeus.shopping.flightOffersSearch.pricing.post(requestBody);
+
+        // The rest of the method remains the same.
         if (priced != null && priced.getResponse() != null) {
             return priced.getResponse().getResult();
         }
         return new JsonObject();
     }
-
-
 
     public FlightOrder order(JsonObject order) throws ResponseException {
         return amadeus.booking.flightOrders.post(order);

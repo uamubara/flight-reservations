@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom"; // v6 API
+import { Routes, Route, Navigate } from "react-router-dom";
 import Scrollreveal from "scrollreveal";
 
 import Navbar from "./components/Navbar";
@@ -10,36 +10,20 @@ import Reviews from "./components/Reviews";
 import Booking from "./components/Booking";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
+import Confirm from "./components/Confirm";
+import Order from "./components/Order";
 
-// landing page content
 function Landing() {
     useEffect(() => {
-        // Basic scroll reveal for the landing sections
         const sr = Scrollreveal({
-            origin: "top",
-            distance: "80px",
-            duration: 2000,
-            reset: true,
+            origin: "top", distance: "80px", duration: 2000, reset: true,
         });
-        sr.reveal(
-            `
-      nav,
-      #hero,
-      #services,
-      #recommended,
-      #reviews,
-      footer
-    `,
-            { opacity: 0, interval: 300 }
-        );
+        sr.reveal(`nav, #hero, #services, #recommended, #reviews, footer`, { opacity: 0, interval: 300 });
     }, []);
 
     return (
         <>
-            {/* ScrollToTop uses useLocation internally. */}
             <ScrollToTop />
-
-            {/* Your existing landing layout */}
             <Navbar />
             <Hero />
             <Services />
@@ -50,19 +34,25 @@ function Landing() {
     );
 }
 
+function PageWrapper({ children }) {
+    return (
+        <>
+            <ScrollToTop />
+            <Navbar />
+            <main style={{ paddingTop: '2rem', paddingBottom: '2rem' }}>{children}</main>
+            <Footer />
+        </>
+    );
+}
+
 export default function App() {
     return (
-        // Routes for the app.
         <Routes>
-            {/* Landing page */}
             <Route path="/" element={<Landing />} />
-
-            {/* Booking page */}
             <Route path="/booking" element={<Booking />} />
-
-            {/* Optional: fallback to home for any unknown route */}
+            <Route path="/confirm" element={<PageWrapper><Confirm /></PageWrapper>} />
+            <Route path="/order" element={<PageWrapper><Order /></PageWrapper>} />
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );
 }
-

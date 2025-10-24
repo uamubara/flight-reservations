@@ -44,6 +44,9 @@ export default function Booking() {
 
             const r = await fetch(`${BASE}/api/flights?${qs.toString()}`);
             if (!r.ok) {
+                if (r.status === 400) {
+                    throw new Error("No available flights were found for this route. Please try a different search.");
+                }
                 const errText = await r.text();
                 try {
                     const errJson = JSON.parse(errText);
@@ -71,7 +74,7 @@ export default function Booking() {
             <Header>
                 <div className="wrap">
                     <h1>Book your next flight</h1>
-                    <p>Fast, simple, and secure — find the best airfare deals.</p>
+                    <p>Fast, simple, and secure â€” find the best airfare deals.</p>
                 </div>
             </Header>
 
@@ -97,7 +100,7 @@ export default function Booking() {
                     </div>
                 </Tools>
 
-                {loading && <StateBox>Searching…</StateBox>}
+                {loading && <StateBox>Searchingâ€¦</StateBox>}
                 {error && !loading && <StateBox error>{error}</StateBox>}
                 {!loading && !error && results.length === 0 && (
                     <StateBox>Try a search to see flights.</StateBox>

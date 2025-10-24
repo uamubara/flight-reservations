@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import styled from "styled-components";
 import LocationSelect from "./LocationSelect";
 
-// --- Passenger Dropdown Component (No changes needed) ---
+// --- Passenger Dropdown Component ---
 const PassengerDropdown = ({ adults, setAdults, children, setChildren, infants, setInfants, errors }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [tooltip, setTooltip] = useState(null);
@@ -44,7 +44,7 @@ const PassengerDropdown = ({ adults, setAdults, children, setChildren, infants, 
             <label>Passengers</label>
             <DropdownButton type="button" onClick={() => setIsOpen(!isOpen)} active={isOpen}>
                 <span>{getSummary()}</span>
-                <span className="arrow">{isOpen ? '▲' : '▼'}</span>
+                <span className="arrow">{isOpen ? 'â–²' : 'â–¼'}</span>
             </DropdownButton>
             {isOpen && (
                 <Panel>
@@ -103,13 +103,37 @@ export default function Locate({ onSearch }) {
     const [adults, setAdults] = useState(1);
     const [children, setChildren] = useState(0);
     const [infants, setInfants] = useState(0);
-    const [travelClass, setTravelClass] = useState("ALL");
+    const [travelClass, setTravelClass] = useState("ECONOMY");
     const [errors, setErrors] = useState({});
+    const [isClassOpen, setIsClassOpen] = useState(false);
+    const classDropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (classDropdownRef.current && !classDropdownRef.current.contains(event.target)) {
+                setIsClassOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const classOptions = {
+        'ECONOMY': 'Economy Class',
+        'PREMIUM_ECONOMY': 'Premium Economy',
+        'BUSINESS': 'Business Class',
+        'FIRST': 'First Class',
+    };
 
     const validate = () => {
         const e = {};
         if (!origin.code || !/^[A-Za-z]{3}$/.test(origin.code)) e.origin = "Please choose an origin airport from the list";
         if (!destination.code || !/^[A-Za-z]{3}$/.test(destination.code)) e.destination = "Please choose a destination airport from the list";
+
+        if (origin.code && destination.code && origin.code === destination.code) {
+            e.destination = "Origin and destination cannot be the same.";
+        }
+
         if (!departDate) e.departDate = "Choose a departure date";
         if (tripType === "roundtrip" && !returnDate) e.returnDate = "Choose a return date";
         if (adults + children === 0) e.passengers = "At least 1 adult or child is required.";
@@ -119,18 +143,34 @@ export default function Locate({ onSearch }) {
         return Object.keys(e).length === 0;
     };
 
+    const handleSelectClass = (value) => {
+        setTravelClass(value);
+        setIsClassOpen(false);
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!validate()) return;
+
+        // Helper function to format dates correctly to YYYY-MM-DD
+        const formatDate = (dateString) => {
+            if (!dateString) return undefined;
+            const date = new Date(dateString);
+            const year = date.getUTCFullYear(); // Use UTC to avoid timezone issues
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
         onSearch?.({
             origin: origin.code.toUpperCase(),
             destination: destination.code.toUpperCase(),
-            departDate,
-            returnDate: tripType === "roundtrip" ? returnDate || undefined : undefined,
+            departDate: formatDate(departDate),
+            returnDate: tripType === "roundtrip" ? formatDate(returnDate) : undefined,
             adults: Number(adults),
             children: Number(children),
             infants: Number(infants),
-            travelClass: travelClass === "ALL" ? "" : travelClass,
+            travelClass: travelClass,
         });
     };
 
@@ -152,6 +192,7 @@ export default function Locate({ onSearch }) {
                         placeholder="Try 'Houston' or 'HOU'"
                         value={origin}
                         onChange={setOrigin}
+                        suggestCurrentLocation={true}
                     />
                     {errors.origin && <Error>{errors.origin}</Error>}
                 </Field>
@@ -175,14 +216,27 @@ export default function Locate({ onSearch }) {
                     {errors.returnDate && <Error>{errors.returnDate}</Error>}
                 </Field>
                 <Field>
-                    <label htmlFor="travelClass">Class</label>
-                    <select id="travelClass" value={travelClass} onChange={(e) => setTravelClass(e.target.value)}>
-                        <option value="ALL">All Classes</option>
-                        <option value="ECONOMY">Economy</option>
-                        <option value="PREMIUM_ECONOMY">Premium Economy</option>
-                        <option value="BUSINESS">Business</option>
-                        <option value="FIRST">First</option>
-                    </select>
+                    <CustomSelectWrapper ref={classDropdownRef}>
+                        <label>Class</label>
+                        <div className="custom-select-header" onClick={() => setIsClassOpen(!isClassOpen)}>
+                            {classOptions[travelClass]}
+                            <span className={`arrow ${isClassOpen ? 'up' : 'down'}`}></span>
+                        </div>
+                        {isClassOpen && (
+                            <div className="custom-select-options">
+                                <div className="custom-select-title">Select class</div>
+                                {Object.entries(classOptions).map(([value, label]) => (
+                                    <div
+                                        key={value}
+                                        className={`custom-select-option ${travelClass === value ? 'selected' : ''}`}
+                                        onClick={() => handleSelectClass(value)}
+                                    >
+                                        {label}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CustomSelectWrapper>
                 </Field>
                 <Field>
                     <PassengerDropdown
@@ -193,8 +247,6 @@ export default function Locate({ onSearch }) {
                     />
                 </Field>
 
-                {/* The Actions component is now a direct child of FormGrid */}
-                {/* to place it correctly in the layout flow. */}
                 <Actions>
                     <button type="submit">Search Flights</button>
                 </Actions>
@@ -204,8 +256,6 @@ export default function Locate({ onSearch }) {
 }
 
 /* --- Styles --- */
-
-// Passenger Dropdown Styles
 const DropdownContainer = styled.div`
     position: relative;
     display: grid;
@@ -313,17 +363,11 @@ const Notice = styled.p`
     padding-top: 0.5rem;
     border-top: 1px solid #e6edf5;
 `;
-
-// --- CORRECTED: Form Layout Styles ---
-
-// The Form component is now a flex container to stack its children vertically.
-// This ensures the Toggle is always on top.
 const Form = styled.form`
     display: flex;
     flex-direction: column;
     gap: .9rem;
 `;
-
 const Toggle = styled.div`
     display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
     button{
@@ -332,50 +376,104 @@ const Toggle = styled.div`
     }
     button.active{ background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
 `;
-
-// The FormGrid now controls the layout of all input fields and the search button.
 const FormGrid = styled.div`
     display: grid;
     gap: 1.5rem .9rem;
-    align-items: end; // Align items to the bottom of the cell for a cleaner look
-
-    // On mobile, everything is a single column.
+    align-items: end;
     grid-template-columns: 1fr;
-
-    // On medium screens, switch to two columns.
     @media (min-width: 768px) {
         grid-template-columns: 1fr 1fr;
     }
-
-    // On large desktop screens, use a three-column layout.
     @media (min-width: 1024px) {
         grid-template-columns: 1fr 1fr 1fr;
     }
 `;
-
+const CustomSelectWrapper = styled.div`
+    position: relative;
+    display: grid;
+    gap: .35rem;
+    .custom-select-header {
+        border: 1px solid #e6edf5;
+        border-radius: .65rem;
+        padding: .6rem .75rem;
+        font-size: 1rem;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fff;
+    }
+    .arrow {
+        border: solid #333;
+        border-width: 0 2px 2px 0;
+        display: inline-block;
+        padding: 3px;
+        transform: rotate(45deg);
+        -webkit-transform: rotate(45deg);
+        transition: transform 0.2s ease;
+    }
+    .arrow.up {
+        transform: rotate(-135deg);
+        -webkit-transform: rotate(-135deg);
+    }
+    .custom-select-options {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #e6edf5;
+        border-radius: .65rem;
+        z-index: 10;
+        padding: 0.5rem;
+        box-shadow: 0 8px 20px rgba(2, 62, 138, 0.08);
+    }
+    .custom-select-title {
+        padding: 0.5rem 0.5rem 0.8rem;
+        color: #64748b;
+        font-weight: 500;
+        border-bottom: 1px solid #f1f5f9;
+        margin-bottom: 0.3rem;
+        font-size: 0.9rem;
+    }
+    .custom-select-option {
+        padding: 0.7rem 0.5rem;
+        cursor: pointer;
+        border-radius: .4rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 500;
+        &:hover {
+            background-color: #f6fbff;
+        }
+        &.selected {
+            font-weight: 600;
+            color: #0ea5e9;
+            &::after {
+                content: 'âœ“';
+                font-size: 1.2rem;
+                color: #0ea5e9;
+            }
+        }
+    }
+`;
 const Field = styled.div`
     display:grid; gap:.35rem;
-    min-width: 160px; // Prevent fields from becoming too narrow
+    min-width: 160px;
     ${({ hidden }) => hidden && `display:none;`}
     label { font-weight:700; color:#0b7285; }
     input, select { border:1px solid #e6edf5; border-radius:.65rem; padding:.6rem .75rem; font-size:1rem; width: 100%; box-sizing: border-box; }
 `;
-
-// The Actions component now takes up a grid cell and aligns its content (the button) to the end.
 const Actions = styled.div`
     display:flex;
     justify-content: flex-end;
-
-    // On large screens, ensure it sits in the last column.
     @media (min-width: 1024px) {
         grid-column: 3 / 4;
     }
-
-    // On medium screens, it will be in the second column.
     @media (min-width: 768px) and (max-width: 1023px) {
         grid-column: 2 / 3;
     }
-
     button {
         background:#0ea5e9;
         color:#fff;
@@ -385,13 +483,10 @@ const Actions = styled.div`
         cursor:pointer;
         font-weight:700;
         font-size: 1rem;
-        width: 100%; // Make button take full width of its container cell
-
-        // Set a max-width on medium screens and up to prevent a huge button
+        width: 100%;
         @media (min-width: 768px) {
             width: auto;
         }
     }
 `;
-
 const Error = styled.div`color:#c92a2a; font-size:.9rem; margin-top: .2rem;`;

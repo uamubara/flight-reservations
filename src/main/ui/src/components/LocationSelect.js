@@ -1,18 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 
-// Note: Your IDE may show warnings like "Unresolved variable" for properties like 'cityName' or 'iataCode'.
-// This is expected because the shape of the API data is dynamic. The code is written safely
-// with optional chaining (the '?' symbols) and fallbacks to prevent any runtime errors.
-
 const BASE = (process.env.REACT_APP_API_BASE || "http://localhost:8081").replace(/\/$/, "");
 
-export default function LocationSelect({ label, placeholder, value, onChange }) {
+export default function LocationSelect({ label, placeholder, value, onChange, suggestCurrentLocation }) {
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [suggestion, setSuggestion] = useState(null);
     const boxRef = useRef(null);
     const cache = useRef({});
+    const locationSuggested = useRef(false);
 
     const query = value?.display || "";
 
@@ -22,63 +20,77 @@ export default function LocationSelect({ label, placeholder, value, onChange }) 
         return () => document.removeEventListener("mousedown", onDoc);
     }, []);
 
-    useEffect(() => {
-        const t = setTimeout(async () => {
-            if (!query || query.length < 2) {
-                setItems([]);
-                return;
-            }
-
-            if (cache.current[query]) {
-                setItems(cache.current[query]);
-                return;
-            }
-
+    const handleSuggestLocation = () => {
+        if (!suggestCurrentLocation || locationSuggested.current || query) return;
+        locationSuggested.current = true;
+        setLoading(true);
+        navigator.geolocation.getCurrentPosition(async (position) => {
             try {
-                setLoading(true);
-                const r = await fetch(`${BASE}/api/locations?keyword=${encodeURIComponent(query)}`);
+                const { latitude, longitude } = position.coords;
+                const r = await fetch(`${BASE}/api/nearest-airport?latitude=${latitude}&longitude=${longitude}`);
                 const data = (await r.json()) || [];
-
-                const list = Array.isArray(data) ? data.map((loc) => {
-                    const code = loc?.iataCode;
-                    if (!code) return null;
-
-                    const city = loc?.address?.cityName;
-                    const country = loc?.address?.countryName;
-                    const airportName = loc.name;
-
-                    if (city && country) {
-                        return {
-                            code,
-                            mainText: `${city}, ${country}`,
-                            subText: airportName,
-                        };
-                    }
-
-                    return {
-                        code,
-                        mainText: airportName,
-                        subText: `${code} Airport`,
-                    };
-                }).filter(Boolean) : [];
-
-                cache.current[query] = list;
-                setItems(list);
-
+                if (data.length > 0) {
+                    const nearest = data[0];
+                    setSuggestion({
+                        code: nearest.iataCode,
+                        city: nearest.city,
+                        country: nearest.countryCode,
+                        name: nearest.name,
+                    });
+                }
             } catch (e) {
-                console.error(e);
-                setItems([]);
+                console.error("Failed to fetch nearest airport:", e);
             } finally {
                 setLoading(false);
             }
-        }, 250);
-        return () => clearTimeout(t);
+        }, (error) => {
+            console.warn("Could not get location:", error.message);
+            setLoading(false);
+        });
+    };
+
+    useEffect(() => {
+        setItems([]);
+        if (!query || query.length < 2) {
+            return;
+        }
+
+        const debounceTimer = setTimeout(() => {
+            async function fetchData() {
+                if (cache.current[query]) {
+                    setItems(cache.current[query]);
+                    return;
+                }
+                try {
+                    setLoading(true);
+                    const r = await fetch(`${BASE}/api/locations?keyword=${encodeURIComponent(query)}`);
+                    const data = (await r.json()) || [];
+                    const list = Array.isArray(data) ? data.map((loc) => ({
+                        code: loc.iataCode,
+                        city: loc.city,
+                        country: loc.countryCode,
+                        name: loc.name,
+                    })).filter(Boolean) : [];
+
+                    cache.current[query] = list;
+                    setItems(list);
+                } catch (e) {
+                    console.error(e);
+                    setItems([]);
+                } finally {
+                    setLoading(false);
+                }
+            }
+            fetchData();
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
     }, [query]);
 
     const pick = (it) => {
         onChange?.({
             code: it.code,
-            display: `${it.mainText} (${it.code})`
+            display: `${it.city} (${it.code})`
         });
         setOpen(false);
     };
@@ -93,22 +105,40 @@ export default function LocationSelect({ label, placeholder, value, onChange }) 
                     onChange?.({ code: "", display: e.target.value });
                     setOpen(true);
                 }}
-                onFocus={() => setOpen(true)}
+                onFocus={() => {
+                    setOpen(true);
+                    handleSuggestLocation();
+                }}
                 autoComplete="off"
             />
-            {open && (items.length > 0 || loading) && (
+            {open && (
                 <List role="listbox">
-                    {loading && <li className="hint">Searching…</li>}
-                    {!loading && items.map((it) => (
-                        <ListItem key={it.code} onClick={() => pick(it)}>
+                    {loading && <li className="hint">Searchingâ€¦</li>}
+
+                    {suggestion && !query && (
+                        <>
+                            <Header><span className="icon">ðŸ“</span> Current location</Header>
+                            <ListItem onClick={() => pick(suggestion)}>
+                                <LocationInfo>
+                                    <MainText>{suggestion.name}</MainText>
+                                    <SubText>{suggestion.city}, {suggestion.country}</SubText>
+                                </LocationInfo>
+                                <IataCode>{suggestion.code}</IataCode>
+                            </ListItem>
+                        </>
+                    )}
+
+                    <Header><span className="icon">*</span> All locations</Header>
+                    {!loading && items.map((it, index) => (
+                        <ListItem key={`${it.code}-${index}`} onClick={() => pick(it)}>
                             <LocationInfo>
-                                <MainText>{it.mainText}</MainText>
-                                <SubText>{it.subText}</SubText>
+                                <MainText>{it.name}</MainText>
+                                <SubText>{it.city}, {it.country}</SubText>
                             </LocationInfo>
                             <IataCode>{it.code}</IataCode>
                         </ListItem>
                     ))}
-                    {!loading && items.length === 0 && query && <li className="hint">No matches</li>}
+                    {!loading && items.length === 0 && query && <li className="hint">No matches found</li>}
                 </List>
             )}
         </Box>
@@ -127,9 +157,20 @@ const Box = styled.div`
 const List = styled.ul`
     position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px);
     background: #fff; border: 1px solid #e6edf5; border-radius: .65rem;
-    max-height: 280px; overflow: auto; box-shadow: 0 12px 28px rgba(2,62,138,.08);
+    max-height: 320px; overflow: auto; box-shadow: 0 12px 28px rgba(2,62,138,.08);
     margin: 0; padding: .3rem; list-style: none;
     .hint { padding: .8rem; color: #6b7280; cursor: default; }
+`;
+
+const Header = styled.li`
+    padding: .8rem .8rem .4rem;
+    color: #64748b;
+    font-weight: 600;
+    font-size: .9rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    cursor: default;
 `;
 
 const ListItem = styled.li`
@@ -140,7 +181,6 @@ const ListItem = styled.li`
     align-items: center;
     justify-content: space-between;
     gap: .8rem;
-
     &:hover {
         background: #f6fbff;
     }
