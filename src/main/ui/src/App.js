@@ -12,6 +12,10 @@ import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import Confirm from "./components/Confirm";
 import Order from "./components/Order";
+import SeatSelection from "./components/SeatSelection";
+import Addons from "./components/Addons";
+import Payment from "./components/Payment";
+import Confirmation from "./components/Confirmation";
 
 function Landing() {
     useEffect(() => {
@@ -52,6 +56,10 @@ export default function App() {
             <Route path="/booking" element={<Booking />} />
             <Route path="/confirm" element={<PageWrapper><Confirm /></PageWrapper>} />
             <Route path="/order" element={<PageWrapper><Order /></PageWrapper>} />
+            <Route path="/seats" element={<SeatSelection />} />
+            <Route path="/addons" element={<Addons />} />
+            <Route path="/payment" element={<Payment />} />
+            <Route path="/confirmation" element={<Confirmation />} />
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );

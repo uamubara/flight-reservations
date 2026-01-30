@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import styled from "styled-components";
 import LocationSelect from "./LocationSelect";
+import { ChevronDown } from "lucide-react";
 
 // --- Passenger Dropdown Component ---
 const PassengerDropdown = ({ adults, setAdults, children, setChildren, infants, setInfants, errors }) => {
@@ -44,7 +45,14 @@ const PassengerDropdown = ({ adults, setAdults, children, setChildren, infants, 
             <label>Passengers</label>
             <DropdownButton type="button" onClick={() => setIsOpen(!isOpen)} active={isOpen}>
                 <span>{getSummary()}</span>
-                <span className="arrow">{isOpen ? 'â–²' : 'â–¼'}</span>
+                <ChevronDown
+                    size={18}
+                    className="arrow"
+                    style={{
+                        transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease'
+                    }}
+                />
             </DropdownButton>
             {isOpen && (
                 <Panel>
@@ -451,7 +459,7 @@ const CustomSelectWrapper = styled.div`
             font-weight: 600;
             color: #0ea5e9;
             &::after {
-                content: 'âœ“';
+                content: '✓';
                 font-size: 1.2rem;
                 color: #0ea5e9;
             }
